@@ -7,6 +7,8 @@ import (
 	"death-clock/events"
 	"death-clock/lib/e"
 	"death-clock/storage"
+
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 type Processor struct {
@@ -26,6 +28,18 @@ var (
 )
 
 func New(client *telegram.Client, storage storage.Storage) *Processor {
+	keyboard := tgbotapi.NewReplyKeyboard(
+		tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton("Calculate Death Clock"),
+			tgbotapi.NewKeyboardButton("Help"),
+		),
+		tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton("Random"),
+		),
+	)
+	keyboard.ResizeKeyboard = true
+	keyboard.OneTimeKeyboard = true
+
 	return &Processor{
 		tg:      client,
 		storage: storage,

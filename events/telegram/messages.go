@@ -1,13 +1,12 @@
 package telegram
 
-const msgHelp = `I can save and keep you pages. Also I can offer you them to read.
+const msgHelp = `I am a bot designed to remind you how precious every day of your life is!
 
-In order to save the page, just send me al link to it.
+Enter your birth date (e.g., 01.01.1990), and I'll calculate how many days you might have left based on expected life span. This isn't about fear—it's about inspiration! Discover how much time you have to chase your dreams, achieve your goals, and make a mark on the world.
 
-In order to get a random page from your list, send me command /rnd.
-Caution! After that, this page will be removed from your list!`
+💡 Let's get started: share your birth date, and I'll show you how many days you can live boldly and purposefully!`
 
-const msgHello = "Hi there! 👾\n\n" + msgHelp
+const msgHello = "👋 Hello! I'm Death-counter. \n\n" + msgHelp
 
 const (
 	msgUnknownCommand = "Unknown command 🤔"
