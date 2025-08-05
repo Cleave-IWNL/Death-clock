@@ -9,13 +9,30 @@ import (
 
 	"death-clock/lib/e"
 	"death-clock/storage"
+
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 const (
-	RndCmd   = "/rnd"
-	HelpCmd  = "/help"
-	StartCmd = "/start"
+	LifeCalendarCmd = "📅 Life calendar"
+	HelpCmd         = "/help"
+	StartCmd        = "👋 Start"
+	OpenNotebookCmd = "📖 Open my notebook"
+	ShowTimeLeftCmd = "🕘 How much time do i have left?"
 )
+
+func GetStaticKeyboard() tgbotapi.ReplyKeyboardMarkup {
+	return tgbotapi.NewReplyKeyboard(
+		tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton(StartCmd),
+			tgbotapi.NewKeyboardButton(ShowTimeLeftCmd),
+		),
+		tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton(OpenNotebookCmd),
+			tgbotapi.NewKeyboardButton(LifeCalendarCmd),
+		),
+	)
+}
 
 func (p *Processor) doCmd(text string, chatID int, username string) error {
 	text = strings.TrimSpace(text)
@@ -27,14 +44,20 @@ func (p *Processor) doCmd(text string, chatID int, username string) error {
 	}
 
 	switch text {
-	case RndCmd:
+	case LifeCalendarCmd:
 		return p.sendRandom(chatID, username)
 	case HelpCmd:
 		return p.sendHelp(chatID)
-	case StartCmd:
+	case "/start":
 		return p.sendHello(chatID)
+	case ShowTimeLeftCmd:
+		return p.sendHelp(chatID)
+	case OpenNotebookCmd:
+		return p.sendHello(chatID)
+	case StartCmd:
+		return p.sendHelp(chatID)
 	default:
-		return p.tg.SendMessage(chatID, msgUnknownCommand)
+		return p.tg.SendMessage(chatID, msgUnknownCommand, GetStaticKeyboard())
 	}
 }
 
@@ -73,10 +96,10 @@ func (p *Processor) sendRandom(chatID int, username string) (err error) {
 		return err
 	}
 	if errors.Is(err, storage.ErrNoSavedPages) {
-		return p.tg.SendMessage(chatID, msgNoSavedPages)
+		return p.tg.SendMessage(chatID, msgNoSavedPages, GetStaticKeyboard())
 	}
 
-	if err := p.tg.SendMessage(chatID, page.URL); err != nil {
+	if err := p.tg.SendMessage(chatID, page.URL, GetStaticKeyboard()); err != nil {
 		return err
 	}
 
@@ -84,11 +107,11 @@ func (p *Processor) sendRandom(chatID int, username string) (err error) {
 }
 
 func (p *Processor) sendHelp(chatID int) error {
-	return p.tg.SendMessage(chatID, msgHelp)
+	return p.tg.SendMessage(chatID, msgHelp, GetStaticKeyboard())
 }
 
 func (p *Processor) sendHello(chatID int) error {
-	return p.tg.SendMessage(chatID, msgHello)
+	return p.tg.SendMessage(chatID, msgHello, GetStaticKeyboard())
 }
 
 func isAddCmd(text string) bool {

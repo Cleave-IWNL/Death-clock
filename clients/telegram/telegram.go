@@ -8,6 +8,8 @@ import (
 	"path"
 	"strconv"
 
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+
 	"death-clock/lib/e"
 )
 
@@ -55,12 +57,20 @@ func (c *Client) Updates(offset int, limit int) (updates []Update, err error) {
 	return res.Result, nil
 }
 
-func (c *Client) SendMessage(chatID int, text string) error {
+func (c *Client) SendMessage(chatID int, text string, replyMarkup ...tgbotapi.ReplyKeyboardMarkup) error {
 	q := url.Values{}
 	q.Add("chat_id", strconv.Itoa(chatID))
 	q.Add("text", text)
 
-	_, err := c.doRequest(sendMessageMethod, q)
+	if len(replyMarkup) > 0 {
+		markupBytes, err := json.Marshal(replyMarkup[0])
+		if err != nil {
+			return e.Wrap("can't marshal reply markup", err)
+		}
+		q.Add("reply_markup", string(markupBytes))
+	}
+
+	_, err := c.doRequest("sendMessage", q)
 	if err != nil {
 		return e.Wrap("can't send message", err)
 	}
