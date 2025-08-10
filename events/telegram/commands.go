@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"death-clock/lib/e"
@@ -14,17 +15,18 @@ import (
 )
 
 const (
-	LifeCalendarCmd = "📅 Life calendar"
-	HelpCmd         = "/help"
-	StartCmd        = "👋 Start"
-	OpenNotebookCmd = "📖 Open my notebook"
-	ShowTimeLeftCmd = "🕘 How much time do i have left?"
+	LifeCalendarCmd   = "📅 Life calendar"
+	HelpCmd           = "/help"
+	StartCmd          = "/start"
+	StartCalculateCmd = "👋 Start"
+	OpenNotebookCmd   = "📖 Open my notebook"
+	ShowTimeLeftCmd   = "🕘 How much time do i have left?"
 )
 
 func GetStaticKeyboard() tgbotapi.ReplyKeyboardMarkup {
 	return tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton(StartCmd),
+			tgbotapi.NewKeyboardButton(StartCalculateCmd),
 			tgbotapi.NewKeyboardButton(ShowTimeLeftCmd),
 		),
 		tgbotapi.NewKeyboardButtonRow(
@@ -43,22 +45,53 @@ func (p *Processor) doCmd(text string, chatID int, username string) error {
 		return p.savePage(chatID, text, username)
 	}
 
+	if isNumber(text) {
+		return p.processAge(chatID, text, username)
+	}
+
 	switch text {
 	case LifeCalendarCmd:
 		return p.sendRandom(chatID, username)
 	case HelpCmd:
 		return p.sendHelp(chatID)
-	case "/start":
+	case StartCmd:
 		return p.sendHello(chatID)
 	case ShowTimeLeftCmd:
 		return p.sendHelp(chatID)
 	case OpenNotebookCmd:
 		return p.sendHello(chatID)
-	case StartCmd:
-		return p.sendHelp(chatID)
+	case StartCalculateCmd:
+		return p.sendGettingDeathAge(chatID, text, username)
 	default:
 		return p.tg.SendMessage(chatID, msgUnknownCommand, GetStaticKeyboard())
 	}
+}
+
+func (p *Processor) processAge(chatID int, pageURL string, username string) (err error) {
+	defer func() { err = e.WrapIfErr("can't do command: save page", err) }()
+
+	page := &storage.Page{
+		URL:      pageURL,
+		UserName: username,
+	}
+
+	isExists, err := p.storage.IsExists(context.Background(), page)
+	if err != nil {
+		return err
+	}
+	if isExists {
+		return p.tg.SendMessage(chatID, msgAlreadyExists)
+	}
+
+	if err := p.storage.Save(context.Background(), page); err != nil {
+		return err
+	}
+
+	if err := p.tg.SendMessage(chatID, msgSaved); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (p *Processor) savePage(chatID int, pageURL string, username string) (err error) {
@@ -106,6 +139,37 @@ func (p *Processor) sendRandom(chatID int, username string) (err error) {
 	return p.storage.Remove(context.Background(), page)
 }
 
+func (p *Processor) sendGettingDeathAge(chatID int, pageURL string, username string) (err error) {
+	defer func() { err = e.WrapIfErr("can't do command: can't get death age", err) }()
+
+	page := &storage.Page{
+		URL:             pageURL,
+		UserName:        username,
+		IsDeathAgeAsked: true,
+	}
+
+	if err := p.storage.Save(context.Background(), page); err != nil {
+		return err
+	}
+
+	var markup = tgbotapi.NewReplyKeyboard(
+		tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton("60"),
+			tgbotapi.NewKeyboardButton("70"),
+		),
+		tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton("80"),
+			tgbotapi.NewKeyboardButton("90"),
+		),
+	)
+
+	if err := p.tg.SendMessage(chatID, "Please select your expected lifespan", markup); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (p *Processor) sendHelp(chatID int) error {
 	return p.tg.SendMessage(chatID, msgHelp, GetStaticKeyboard())
 }
@@ -122,4 +186,16 @@ func isURL(text string) bool {
 	u, err := url.Parse(text)
 
 	return err == nil && u.Host != ""
+}
+
+func isNumber(text string) bool {
+	if _, err := strconv.ParseFloat(text, 64); err == nil {
+		return true
+	}
+
+	if _, err := strconv.Atoi(text); err == nil {
+		return true
+	}
+
+	return false
 }

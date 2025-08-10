@@ -20,8 +20,9 @@ type Storage interface {
 var ErrNoSavedPages = errors.New("no saved pages")
 
 type Page struct {
-	URL      string
-	UserName string
+	URL             string
+	UserName        string
+	IsDeathAgeAsked bool
 }
 
 func (p Page) Hash() (string, error) {
