@@ -41,11 +41,17 @@ func (p *Processor) doCmd(text string, chatID int, username string) error {
 
 	log.Printf("got new command '%s' from '%s", text, username)
 
+	page, err := p.storage.GetLatestPage(context.Background(), username)
+
+	if err != nil {
+
+	}
+
 	if isAddCmd(text) {
 		return p.savePage(chatID, text, username)
 	}
 
-	if isNumber(text) {
+	if page.IsDeathAgeAsked && isNumber(text) {
 		return p.processAge(chatID, text, username)
 	}
 
@@ -68,11 +74,12 @@ func (p *Processor) doCmd(text string, chatID int, username string) error {
 }
 
 func (p *Processor) processAge(chatID int, pageURL string, username string) (err error) {
-	defer func() { err = e.WrapIfErr("can't do command: save page", err) }()
+	defer func() { err = e.WrapIfErr("can't do command: processAge", err) }()
 
 	page := &storage.Page{
-		URL:      pageURL,
-		UserName: username,
+		URL:             pageURL,
+		UserName:        username,
+		IsDeathAgeAsked: false,
 	}
 
 	isExists, err := p.storage.IsExists(context.Background(), page)

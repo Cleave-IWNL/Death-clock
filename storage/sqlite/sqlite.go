@@ -84,7 +84,7 @@ func (s *Storage) IsExists(ctx context.Context, p *storage.Page) (bool, error) {
 }
 
 func (s *Storage) Init(ctx context.Context) error {
-	q := `CREATE TABLE IF NOT EXISTS pages (url TEXT, user_name TEXT)`
+	q := `CREATE TABLE IF NOT EXISTS pages (url TEXT, user_name TEXT, is_death_age_asked BOOLEAN DEFAULT 0)`
 
 	_, err := s.db.ExecContext(ctx, q)
 
@@ -93,4 +93,35 @@ func (s *Storage) Init(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (s *Storage) IsDea(ctx context.Context, p *storage.Page) (bool, error) {
+	q := `SELECT COUNT(*) FROM pages WHERE url = ? AND user_name = ?`
+
+	var count int
+	err := s.db.QueryRowContext(ctx, q, p.URL, p.UserName).Scan(&count)
+
+	if err == sql.ErrNoRows {
+		return false, fmt.Errorf("can't check if page exists: %w", err)
+	}
+
+	return count > 0, nil
+}
+
+func (s *Storage) GetLatestPage(ctx context.Context, userName string) (*storage.Page, error) {
+	q := `SELECT url, is_death_age_asked FROM pages WHERE user_name = ? ORDER BY ROWID DESC LIMIT 1`
+	var url string
+	var isDeathAgeAsked bool
+	err := s.db.QueryRowContext(ctx, q, userName).Scan(&url, &isDeathAgeAsked)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("can't get latest page: %w", err)
+	}
+	return &storage.Page{
+		URL:             url,
+		UserName:        userName,
+		IsDeathAgeAsked: isDeathAgeAsked,
+	}, nil
 }
