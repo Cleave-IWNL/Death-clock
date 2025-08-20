@@ -41,18 +41,8 @@ func (p *Processor) doCmd(text string, chatID int, username string) error {
 
 	log.Printf("got new command '%s' from '%s", text, username)
 
-	page, err := p.storage.GetLatestPage(context.Background(), username)
-
-	if err != nil {
-
-	}
-
 	if isAddCmd(text) {
 		return p.savePage(chatID, text, username)
-	}
-
-	if page.IsDeathAgeAsked && isNumber(text) {
-		return p.processAge(chatID, text, username)
 	}
 
 	switch text {
@@ -69,6 +59,16 @@ func (p *Processor) doCmd(text string, chatID int, username string) error {
 	case StartCalculateCmd:
 		return p.sendGettingDeathAge(chatID, text, username)
 	default:
+		page, err := p.storage.GetLatestPage(context.Background(), username)
+
+		if err != nil {
+			return e.Wrap("can't get latest page: '%s", err)
+		}
+
+		if page.IsDeathAgeAsked && isNumber(text) {
+			return p.processAge(chatID, text, username)
+		}
+
 		return p.tg.SendMessage(chatID, msgUnknownCommand, GetStaticKeyboard())
 	}
 }
@@ -80,14 +80,7 @@ func (p *Processor) processAge(chatID int, pageURL string, username string) (err
 		URL:             pageURL,
 		UserName:        username,
 		IsDeathAgeAsked: false,
-	}
-
-	isExists, err := p.storage.IsExists(context.Background(), page)
-	if err != nil {
-		return err
-	}
-	if isExists {
-		return p.tg.SendMessage(chatID, msgAlreadyExists)
+		IsBirthdayAsked: true,
 	}
 
 	if err := p.storage.Save(context.Background(), page); err != nil {

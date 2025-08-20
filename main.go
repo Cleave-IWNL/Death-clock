@@ -2,38 +2,43 @@ package main
 
 import (
 	"context"
+	"log"
+	"os"
+
+	"github.com/joho/godotenv"
+
 	tgClient "death-clock/clients/telegram"
 	event_consumer "death-clock/consumer/event-consumer"
 	"death-clock/events/telegram"
 	"death-clock/storage/sqlite"
-	"flag"
-	"log"
 )
 
 const (
-	tgBotHost = "api.telegram.org"
-
+	tgBotHost      = "api.telegram.org"
 	storageSqlPath = "data/sqlite/storage.db"
-
-	batchSize = 100
+	batchSize      = 100
 )
 
 func main() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Println("⚠️  .env file not found, reading environment variables directly")
+	}
+
+	token := mustToken()
+
 	s, err := sqlite.New(storageSqlPath)
 	if err != nil {
 		log.Fatalf("can't connect to the storage: %s", err)
 	}
 
 	err = s.Init(context.TODO())
-
 	if err != nil {
-		log.Fatalf("can't innit storage: %s", err)
+		log.Fatalf("can't init storage: %s", err)
 	}
 
 	eventsProcessor := telegram.New(
-
-		tgClient.New(tgBotHost, mustToken()),
-
+		tgClient.New(tgBotHost, token),
 		s,
 	)
 
@@ -47,17 +52,9 @@ func main() {
 }
 
 func mustToken() string {
-	token := flag.String(
-		"tg-bot-token",
-		"",
-		"token for access to telegram bot",
-	)
-
-	flag.Parse()
-
-	if *token == "" {
-		log.Fatal("token is not specified")
+	token := os.Getenv("TG_BOT_TOKEN")
+	if token == "" {
+		log.Fatal("TG_BOT_TOKEN is not set in environment")
 	}
-
-	return *token
+	return token
 }
