@@ -2,11 +2,11 @@ package telegram
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"log"
-	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"death-clock/lib/e"
 	"death-clock/storage"
@@ -41,13 +41,37 @@ func (p *Processor) doCmd(text string, chatID int, username string) error {
 
 	log.Printf("got new command '%s' from '%s", text, username)
 
-	if isAddCmd(text) {
-		return p.savePage(chatID, text, username)
+	userExists, err := p.storage.IsUserExists(context.Background(), username)
+	if err != nil {
+		return e.Wrap("can't check if user exists in db: %s", err)
+	}
+
+	if !userExists {
+		user := &storage.User{
+			UserName:        username,
+			IsDeathAgeAsked: false,
+			IsBirthdayAsked: false,
+		}
+
+		p.storage.InitUser(context.Background(), user)
+	}
+
+	user, err := p.storage.GetUserData(context.Background(), username)
+	if err != nil {
+		return e.Wrap("can't get user data: %s", err)
+	}
+
+	if user.IsDeathAgeAsked && isNumber(text) {
+		p.processAge(chatID, username, text)
+	}
+
+	if user.IsBirthdayAsked && isNumber(text) {
+		p.processBirthday(chatID, username, text)
 	}
 
 	switch text {
 	case LifeCalendarCmd:
-		return p.sendRandom(chatID, username)
+		return p.sendHelp(chatID)
 	case HelpCmd:
 		return p.sendHelp(chatID)
 	case StartCmd:
@@ -57,98 +81,86 @@ func (p *Processor) doCmd(text string, chatID int, username string) error {
 	case OpenNotebookCmd:
 		return p.sendHello(chatID)
 	case StartCalculateCmd:
-		return p.sendGettingDeathAge(chatID, text, username)
+		return p.sendGettingDeathAge(chatID, username)
 	default:
-		page, err := p.storage.GetLatestPage(context.Background(), username)
-
-		if err != nil {
-			return e.Wrap("can't get latest page: '%s", err)
-		}
-
-		if page.IsDeathAgeAsked && isNumber(text) {
-			return p.processAge(chatID, text, username)
-		}
-
 		return p.tg.SendMessage(chatID, msgUnknownCommand, GetStaticKeyboard())
 	}
 }
 
-func (p *Processor) processAge(chatID int, pageURL string, username string) (err error) {
+func (p *Processor) processAge(chatID int, username string, text string) (err error) {
 	defer func() { err = e.WrapIfErr("can't do command: processAge", err) }()
 
-	page := &storage.Page{
-		URL:             pageURL,
+	age, err := strconv.Atoi(text)
+	if err != nil {
+		return fmt.Errorf("invalid death age %q: %w", text, err)
+	}
+
+	page := &storage.User{
 		UserName:        username,
 		IsDeathAgeAsked: false,
 		IsBirthdayAsked: true,
+		DeathAge:        age,
 	}
 
-	if err := p.storage.Save(context.Background(), page); err != nil {
+	if err := p.storage.SaveUser(context.Background(), page); err != nil {
 		return err
 	}
 
-	if err := p.tg.SendMessage(chatID, msgSaved); err != nil {
+	var markup = tgbotapi.NewReplyKeyboard(
+		tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton("60"),
+			tgbotapi.NewKeyboardButton("70"),
+		),
+		tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton("80"),
+			tgbotapi.NewKeyboardButton("90"),
+		),
+	)
+
+	if err := p.tg.SendMessage(chatID, "Please write down your birthday. For example 14.09.2002", markup); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (p *Processor) savePage(chatID int, pageURL string, username string) (err error) {
-	defer func() { err = e.WrapIfErr("can't do command: save page", err) }()
+func (p *Processor) processBirthday(chatID int, username string, text string) (err error) {
+	defer func() { err = e.WrapIfErr("can't do command: processBirthday", err) }()
 
-	page := &storage.Page{
-		URL:      pageURL,
-		UserName: username,
-	}
-
-	isExists, err := p.storage.IsExists(context.Background(), page)
+	// Парсим дату в формате dd.mm.yyyy
+	birthday, err := time.Parse("02.01.2006", text)
 	if err != nil {
-		return err
-	}
-	if isExists {
-		return p.tg.SendMessage(chatID, msgAlreadyExists)
+		return fmt.Errorf("invalid birthday %q: %w", text, err)
 	}
 
-	if err := p.storage.Save(context.Background(), page); err != nil {
+	page := &storage.User{
+		UserName:        username,
+		IsDeathAgeAsked: false,
+		IsBirthdayAsked: true,
+		BirthsDay:       birthday,
+	}
+
+	if err := p.storage.SaveUser(context.Background(), page); err != nil {
 		return err
 	}
 
-	if err := p.tg.SendMessage(chatID, msgSaved); err != nil {
+	if err := p.tg.SendMessage(chatID, fmt.Sprintf("Saved, your death date is: %s", birthday.Format("02.01.2006"))); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (p *Processor) sendRandom(chatID int, username string) (err error) {
-	defer func() { err = e.WrapIfErr("can't do command: can't send random", err) }()
-
-	page, err := p.storage.PickRandom(context.Background(), username)
-	if err != nil && !errors.Is(err, storage.ErrNoSavedPages) {
-		return err
-	}
-	if errors.Is(err, storage.ErrNoSavedPages) {
-		return p.tg.SendMessage(chatID, msgNoSavedPages, GetStaticKeyboard())
-	}
-
-	if err := p.tg.SendMessage(chatID, page.URL, GetStaticKeyboard()); err != nil {
-		return err
-	}
-
-	return p.storage.Remove(context.Background(), page)
-}
-
-func (p *Processor) sendGettingDeathAge(chatID int, pageURL string, username string) (err error) {
+func (p *Processor) sendGettingDeathAge(chatID int, username string) (err error) {
 	defer func() { err = e.WrapIfErr("can't do command: can't get death age", err) }()
 
-	page := &storage.Page{
-		URL:             pageURL,
+	page := &storage.User{
 		UserName:        username,
 		IsDeathAgeAsked: true,
+		IsBirthdayAsked: false,
 	}
 
-	if err := p.storage.Save(context.Background(), page); err != nil {
+	if err := p.storage.SaveUser(context.Background(), page); err != nil {
 		return err
 	}
 
@@ -176,16 +188,6 @@ func (p *Processor) sendHelp(chatID int) error {
 
 func (p *Processor) sendHello(chatID int) error {
 	return p.tg.SendMessage(chatID, msgHello, GetStaticKeyboard())
-}
-
-func isAddCmd(text string) bool {
-	return isURL(text)
-}
-
-func isURL(text string) bool {
-	u, err := url.Parse(text)
-
-	return err == nil && u.Host != ""
 }
 
 func isNumber(text string) bool {

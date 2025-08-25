@@ -28,7 +28,7 @@ func New(path string) (*Storage, error) {
 }
 
 // InitUser initializes the user table if it doesn't exist.
-func (s *Storage) InitUser(ctx context.Context) error {
+func (s *Storage) InitUser(ctx context.Context, p *storage.User) error {
 	q := `
 	CREATE TABLE IF NOT EXISTS users (
 		user_name TEXT PRIMARY KEY,
@@ -41,6 +41,16 @@ func (s *Storage) InitUser(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("can't create table: %w", err)
 	}
+
+	// если нужно сразу создать пользователя:
+	_, err = s.db.ExecContext(ctx,
+		`INSERT OR IGNORE INTO users (user_name) VALUES (?)`,
+		p.UserName,
+	)
+	if err != nil {
+		return fmt.Errorf("can't init user: %w", err)
+	}
+
 	return nil
 }
 
@@ -99,4 +109,20 @@ func (s *Storage) GetUserData(ctx context.Context, userName string) (*storage.Us
 		return nil, fmt.Errorf("can't get user data: %w", err)
 	}
 	return u, nil
+}
+
+func (s *Storage) InitSchema(ctx context.Context) error {
+	q := `
+	CREATE TABLE IF NOT EXISTS users (
+		user_name TEXT PRIMARY KEY,
+		is_death_age_asked BOOLEAN DEFAULT 0,
+		is_birthday_asked BOOLEAN DEFAULT 0,
+		death_age INTEGER DEFAULT NULL,
+		birthday INTEGER DEFAULT NULL
+	)`
+	_, err := s.db.ExecContext(ctx, q)
+	if err != nil {
+		return fmt.Errorf("can't create table: %w", err)
+	}
+	return nil
 }

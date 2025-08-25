@@ -11,6 +11,8 @@ import (
 	event_consumer "death-clock/consumer/event-consumer"
 	"death-clock/events/telegram"
 	"death-clock/storage/sqlite"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 const (
@@ -32,15 +34,14 @@ func main() {
 		log.Fatalf("can't connect to the storage: %s", err)
 	}
 
-	err = s.Init(context.TODO())
-	if err != nil {
-		log.Fatalf("can't init storage: %s", err)
-	}
-
 	eventsProcessor := telegram.New(
 		tgClient.New(tgBotHost, token),
 		s,
 	)
+
+	if err := s.InitSchema(context.Background()); err != nil {
+		log.Fatalf("failed to init schema: %v", err)
+	}
 
 	log.Print("service started")
 

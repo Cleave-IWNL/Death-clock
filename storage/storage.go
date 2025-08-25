@@ -6,14 +6,19 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"time"
 
 	"death-clock/lib/e"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 type Storage interface {
 	SaveUser(ctx context.Context, p *User) error
-	IsUserExists(ctx context.Context, p *User) (bool, error)
+	IsUserExists(ctx context.Context, userName string) (bool, error)
 	GetUserData(ctx context.Context, userName string) (*User, error)
+	InitUser(ctx context.Context, p *User) error
+	InitSchema(ctx context.Context) error
 }
 
 var ErrNoSavedPages = errors.New("no saved pages")
@@ -23,7 +28,7 @@ type User struct {
 	IsDeathAgeAsked bool
 	IsBirthdayAsked bool
 	DeathAge        int
-	BirthsDay       int
+	BirthsDay       time.Time
 }
 
 func (p User) Hash() (string, error) {
