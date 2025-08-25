@@ -27,7 +27,6 @@ func New(path string) (*Storage, error) {
 	return &Storage{db: db}, nil
 }
 
-// InitUser initializes the user table if it doesn't exist.
 func (s *Storage) InitUser(ctx context.Context, p *storage.User) error {
 	q := `
 	CREATE TABLE IF NOT EXISTS users (
@@ -42,7 +41,7 @@ func (s *Storage) InitUser(ctx context.Context, p *storage.User) error {
 		return fmt.Errorf("can't create table: %w", err)
 	}
 
-	// если нужно сразу создать пользователя:
+	// если нужно сразу создать пользователя
 	_, err = s.db.ExecContext(ctx,
 		`INSERT OR IGNORE INTO users (user_name) VALUES (?)`,
 		p.UserName,
@@ -54,7 +53,6 @@ func (s *Storage) InitUser(ctx context.Context, p *storage.User) error {
 	return nil
 }
 
-// SaveUser inserts or updates user data.
 func (s *Storage) SaveUser(ctx context.Context, u *storage.User) error {
 	q := `
 	INSERT INTO users (user_name, is_death_age_asked, is_birthday_asked, death_age, birthday)
@@ -78,7 +76,6 @@ func (s *Storage) SaveUser(ctx context.Context, u *storage.User) error {
 	return nil
 }
 
-// IsUserExists checks if a user exists by username.
 func (s *Storage) IsUserExists(ctx context.Context, userName string) (bool, error) {
 	q := `SELECT COUNT(*) FROM users WHERE user_name = ?`
 	var count int
@@ -89,7 +86,6 @@ func (s *Storage) IsUserExists(ctx context.Context, userName string) (bool, erro
 	return count > 0, nil
 }
 
-// GetUserData retrieves user data by username.
 func (s *Storage) GetUserData(ctx context.Context, userName string) (*storage.User, error) {
 	q := `SELECT user_name, is_death_age_asked, is_birthday_asked, death_age, birthday 
 	      FROM users WHERE user_name = ? LIMIT 1`
