@@ -1,2 +1,3 @@
 death-clock
 .env
+data/sqlite/*.db

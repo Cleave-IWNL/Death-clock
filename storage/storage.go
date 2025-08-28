@@ -24,17 +24,17 @@ type Storage interface {
 var ErrNoSavedPages = errors.New("no saved pages")
 
 type User struct {
-	UserName        string
-	IsDeathAgeAsked bool
-	IsBirthdayAsked bool
-	DeathAge        int
-	BirthsDay       time.Time
+	UserName        *string
+	IsDeathAgeAsked *bool
+	IsBirthdayAsked *bool
+	DeathAge        *int
+	BirthsDay       *time.Time
 }
 
 func (p User) Hash() (string, error) {
 	h := sha1.New()
 
-	if _, err := io.WriteString(h, p.UserName); err != nil {
+	if _, err := io.WriteString(h, *p.UserName); err != nil {
 		return "", e.Wrap("can't calculate hash", err)
 	}
 

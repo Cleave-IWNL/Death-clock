@@ -48,9 +48,9 @@ func (p *Processor) doCmd(text string, chatID int, username string) error {
 
 	if !userExists {
 		user := &storage.User{
-			UserName:        username,
-			IsDeathAgeAsked: false,
-			IsBirthdayAsked: false,
+			UserName:        &username,
+			IsDeathAgeAsked: BoolPtr(false),
+			IsBirthdayAsked: BoolPtr(false),
 		}
 
 		p.storage.InitUser(context.Background(), user)
@@ -61,12 +61,15 @@ func (p *Processor) doCmd(text string, chatID int, username string) error {
 		return e.Wrap("can't get user data: %s", err)
 	}
 
-	if user.IsDeathAgeAsked && isNumber(text) {
+	if *user.IsDeathAgeAsked && isNumber(text) {
 		p.processAge(chatID, username, text)
+
+		return nil
 	}
 
-	if user.IsBirthdayAsked && isNumber(text) {
+	if *user.IsBirthdayAsked {
 		p.processBirthday(chatID, username, text)
+		return nil
 	}
 
 	switch text {
@@ -96,10 +99,10 @@ func (p *Processor) processAge(chatID int, username string, text string) (err er
 	}
 
 	page := &storage.User{
-		UserName:        username,
-		IsDeathAgeAsked: false,
-		IsBirthdayAsked: true,
-		DeathAge:        age,
+		UserName:        &username,
+		IsDeathAgeAsked: BoolPtr(false),
+		IsBirthdayAsked: BoolPtr(true),
+		DeathAge:        &age,
 	}
 
 	if err := p.storage.SaveUser(context.Background(), page); err != nil {
@@ -134,10 +137,10 @@ func (p *Processor) processBirthday(chatID int, username string, text string) (e
 	}
 
 	page := &storage.User{
-		UserName:        username,
-		IsDeathAgeAsked: false,
-		IsBirthdayAsked: true,
-		BirthsDay:       birthday,
+		UserName:        &username,
+		IsDeathAgeAsked: BoolPtr(false),
+		IsBirthdayAsked: BoolPtr(true),
+		BirthsDay:       &birthday,
 	}
 
 	if err := p.storage.SaveUser(context.Background(), page); err != nil {
@@ -155,9 +158,9 @@ func (p *Processor) sendGettingDeathAge(chatID int, username string) (err error)
 	defer func() { err = e.WrapIfErr("can't do command: can't get death age", err) }()
 
 	page := &storage.User{
-		UserName:        username,
-		IsDeathAgeAsked: true,
-		IsBirthdayAsked: false,
+		UserName:        &username,
+		IsDeathAgeAsked: BoolPtr(true),
+		IsBirthdayAsked: BoolPtr(false),
 	}
 
 	if err := p.storage.SaveUser(context.Background(), page); err != nil {
@@ -201,3 +204,5 @@ func isNumber(text string) bool {
 
 	return false
 }
+
+func BoolPtr(b bool) *bool { return &b }

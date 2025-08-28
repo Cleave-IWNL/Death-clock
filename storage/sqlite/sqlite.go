@@ -55,14 +55,14 @@ func (s *Storage) InitUser(ctx context.Context, p *storage.User) error {
 
 func (s *Storage) SaveUser(ctx context.Context, u *storage.User) error {
 	q := `
-	INSERT INTO users (user_name, is_death_age_asked, is_birthday_asked, death_age, birthday)
-	VALUES (?, ?, ?, ?, ?)
-	ON CONFLICT(user_name) DO UPDATE SET
-		is_death_age_asked = excluded.is_death_age_asked,
-		is_birthday_asked = excluded.is_birthday_asked,
-		death_age = excluded.death_age,
-		birthday = excluded.birthday
-	`
+    INSERT INTO users (user_name, is_death_age_asked, is_birthday_asked, death_age, birthday)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(user_name) DO UPDATE SET
+        is_death_age_asked = COALESCE(excluded.is_death_age_asked, users.is_death_age_asked),
+        is_birthday_asked  = COALESCE(excluded.is_birthday_asked, users.is_birthday_asked),
+        death_age          = COALESCE(excluded.death_age, users.death_age),
+        birthday           = COALESCE(excluded.birthday, users.birthday)
+    `
 	_, err := s.db.ExecContext(ctx, q,
 		u.UserName,
 		u.IsDeathAgeAsked,
