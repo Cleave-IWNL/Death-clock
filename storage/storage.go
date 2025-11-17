@@ -24,11 +24,12 @@ type Storage interface {
 var ErrNoSavedPages = errors.New("no saved pages")
 
 type User struct {
-	UserName        *string
-	IsDeathAgeAsked *bool
-	IsBirthdayAsked *bool
-	DeathAge        *int
-	BirthsDay       *time.Time
+	UserName          *string
+	IsDeathAgeAsked   *bool
+	IsBirthdayAsked   *bool
+	DeathAge          *int
+	BirthsDay         *time.Time
+	ExpectedDeathDate *time.Time
 }
 
 func (p User) Hash() (string, error) {

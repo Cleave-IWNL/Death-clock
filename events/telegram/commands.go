@@ -67,7 +67,7 @@ func (p *Processor) doCmd(text string, chatID int, username string) error {
 		return nil
 	}
 
-	if *user.IsBirthdayAsked {
+	if *user.IsBirthdayAsked && isValidDate(text) {
 		p.processBirthday(chatID, username, text)
 		return nil
 	}
@@ -130,28 +130,79 @@ func (p *Processor) processAge(chatID int, username string, text string) (err er
 func (p *Processor) processBirthday(chatID int, username string, text string) (err error) {
 	defer func() { err = e.WrapIfErr("can't do command: processBirthday", err) }()
 
-	// Парсим дату в формате dd.mm.yyyy
 	birthday, err := time.Parse("02.01.2006", text)
 	if err != nil {
 		return fmt.Errorf("invalid birthday %q: %w", text, err)
 	}
 
-	page := &storage.User{
-		UserName:        &username,
-		IsDeathAgeAsked: BoolPtr(false),
-		IsBirthdayAsked: BoolPtr(true),
-		BirthsDay:       &birthday,
-	}
-
-	if err := p.storage.SaveUser(context.Background(), page); err != nil {
+	user, err := p.storage.GetUserData(context.Background(), username)
+	if err != nil {
 		return err
 	}
 
-	if err := p.tg.SendMessage(chatID, fmt.Sprintf("Saved, your death date is: %s", birthday.Format("02.01.2006"))); err != nil {
+	if user.DeathAge == nil {
+		return fmt.Errorf("death age not set for user %s", username)
+	}
+
+	deathDate := birthday.AddDate(*user.DeathAge, 0, 0)
+
+	now := time.Now()
+	if deathDate.Before(now) {
+		if err := p.tg.SendMessage(chatID, "Эээ... похоже, вы уже должны быть мертвы 🤔"); err != nil {
+			return err
+		}
+	}
+
+	diff := deathDate.Sub(now)
+
+	days := int(diff.Hours() / 24)
+	weeks := days / 7
+
+	yearsLeft, monthsLeft := calendarDiff(now, deathDate)
+
+	user.BirthsDay = &birthday
+	user.ExpectedDeathDate = &deathDate
+	user.IsBirthdayAsked = BoolPtr(true)
+
+	if err := p.storage.SaveUser(context.Background(), user); err != nil {
+		return err
+	}
+
+	msg := fmt.Sprintf(
+		"Дата смерти: *%s*\n\n"+
+			"Осталось:\n"+
+			"- %d лет\n"+
+			"- %d месяцев\n"+
+			"- %d недель\n"+
+			"- %d дней",
+		deathDate.Format("02.01.2006"),
+		yearsLeft,
+		yearsLeft*12+monthsLeft,
+		weeks,
+		days,
+	)
+
+	if err := p.tg.SendMessage(chatID, msg); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func calendarDiff(start, end time.Time) (years int, months int) {
+	years = end.Year() - start.Year()
+	months = int(end.Month()) - int(start.Month())
+
+	if end.Day() < start.Day() {
+		months--
+	}
+
+	if months < 0 {
+		years--
+		months += 12
+	}
+
+	return
 }
 
 func (p *Processor) sendGettingDeathAge(chatID int, username string) (err error) {
@@ -206,3 +257,8 @@ func isNumber(text string) bool {
 }
 
 func BoolPtr(b bool) *bool { return &b }
+
+func isValidDate(s string) bool {
+	_, err := time.Parse("02.01.2006", s)
+	return err == nil
+}

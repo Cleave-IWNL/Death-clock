@@ -114,7 +114,7 @@ func (s *Storage) InitSchema(ctx context.Context) error {
 		is_death_age_asked BOOLEAN DEFAULT 0,
 		is_birthday_asked BOOLEAN DEFAULT 0,
 		death_age INTEGER DEFAULT NULL,
-		birthday INTEGER DEFAULT NULL
+		birthday DATETIME DEFAULT NULL
 	)`
 	_, err := s.db.ExecContext(ctx, q)
 	if err != nil {
