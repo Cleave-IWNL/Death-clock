@@ -80,7 +80,7 @@ func (p *Processor) doCmd(text string, chatID int, username string) error {
 	case StartCmd:
 		return p.sendHello(chatID)
 	case ShowTimeLeftCmd:
-		return p.sendHelp(chatID)
+		return p.processTimeLeft(chatID, username)
 	case OpenNotebookCmd:
 		return p.sendHello(chatID)
 	case StartCalculateCmd:
@@ -121,6 +121,59 @@ func (p *Processor) processAge(chatID int, username string, text string) (err er
 	)
 
 	if err := p.tg.SendMessage(chatID, "Please write down your birthday. For example 14.09.2002", markup); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (p *Processor) processTimeLeft(chatID int, username string) (err error) {
+	defer func() { err = e.WrapIfErr("can't do command: processTimeLeft", err) }()
+
+	user, err := p.storage.GetUserData(context.Background(), username)
+	if err != nil {
+		return err
+	}
+
+	if user.BirthsDay == nil {
+		if err := p.tg.SendMessage(chatID, "Please complete the calculation first by clicking 'Start'"); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	deathDate := user.BirthsDay.AddDate(*user.DeathAge, 0, 0)
+
+	now := time.Now()
+	if deathDate.Before(now) {
+		if err := p.tg.SendMessage(chatID, "Эээ... похоже, вы уже должны быть мертвы 🤔"); err != nil {
+			return err
+		}
+	}
+
+	diff := deathDate.Sub(now)
+
+	days := int(diff.Hours() / 24)
+	weeks := days / 7
+
+	yearsLeft, monthsLeft := calendarDiff(now, deathDate)
+
+	msg := fmt.Sprintf(
+		"Дата смерти: *%s*\n\n"+
+			"Осталось:\n"+
+			"- %d лет\n"+
+			"- %d месяцев\n"+
+			"- %d недель\n"+
+			"- %d дней",
+		deathDate.Format("02.01.2006"),
+		yearsLeft,
+		yearsLeft*12+monthsLeft,
+		weeks,
+		days,
+	)
+
+	if err := p.tg.SendMessage(chatID, msg); err != nil {
 		return err
 	}
 
