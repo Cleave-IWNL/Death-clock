@@ -22,7 +22,7 @@ type Storage interface {
 }
 
 var ErrNoSavedPages = errors.New("no saved pages")
-
+//g
 type User struct {
 	UserName          *string
 	IsDeathAgeAsked   *bool
